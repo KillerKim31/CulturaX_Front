@@ -6,7 +6,6 @@ export const useCourseStore = defineStore('courses', () => {
   const courses = ref([])
   const currentCourse = ref(null)
   const lessons = ref([])
-  const currentChapter = ref(null)
   const loading = ref(false)
 
   async function fetchCourses() {
@@ -33,12 +32,6 @@ export const useCourseStore = defineStore('courses', () => {
   async function fetchLessons(courseId) {
     const { data } = await api.get(`/courses/${courseId}/lessons`)
     lessons.value = data
-    return data
-  }
-
-  async function fetchChapterMedia(courseId, chapterId) {
-    const { data } = await api.get(`/courses/${courseId}/chapters/${chapterId}/media`)
-    currentChapter.value = data
     return data
   }
 
@@ -80,8 +73,8 @@ export const useCourseStore = defineStore('courses', () => {
   }
 
   return {
-    courses, currentCourse, lessons, currentChapter, loading,
-    fetchCourses, fetchCourseDetail, fetchLessons, fetchChapterMedia,
+    courses, currentCourse, lessons, loading,
+    fetchCourses, fetchCourseDetail, fetchLessons,
     enrollCourse, unenrollCourse, updateProgress,
     getEnrolledCourses, getUserProgress, getCertificates,
     getTest, submitTest,

@@ -14,36 +14,36 @@ async function handleLogout() {
 </script>
 
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+  <nav class="navbar navbar-expand-lg sticky-top" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-light);">
     <div class="container">
-      <RouterLink class="navbar-brand fw-bold" to="/">
-        <i class="bi bi-book-half me-2"></i>CulturaX
+      <RouterLink class="navbar-brand fw-bold d-flex align-items-center" to="/" style="color: var(--primary);">
+        <div class="rounded-lg d-flex align-items-center justify-content-center me-2"
+          style="width: 34px; height: 34px; background: linear-gradient(135deg, #6c63ff, #a78bfa); border-radius: 10px;">
+          <i class="bi bi-book-half text-white"></i>
+        </div>
+        CulturaX
       </RouterLink>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav" ref="navbarCollapse">
         <ul class="navbar-nav me-auto">
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/">
+            <RouterLink class="nav-link" to="/" style="color: var(--text-secondary);">
               <i class="bi bi-collection me-1"></i>Каталог курсов
             </RouterLink>
           </li>
           <template v-if="auth.isAuthenticated">
             <li class="nav-item">
-              <RouterLink class="nav-link" to="/dashboard">
+              <RouterLink class="nav-link" to="/dashboard" style="color: var(--text-secondary);">
                 <i class="bi bi-speedometer2 me-1"></i>Дашборд
               </RouterLink>
             </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/my-courses">
-                <i class="bi bi-book me-1"></i>Мои курсы
-              </RouterLink>
-            </li>
+
             <li class="nav-item" v-if="auth.isAdmin">
-              <RouterLink class="nav-link" to="/admin">
+              <RouterLink class="nav-link" to="/admin" style="color: var(--text-secondary);">
                 <i class="bi bi-shield-lock me-1"></i>Админ
               </RouterLink>
             </li>
@@ -54,8 +54,12 @@ async function handleLogout() {
           <template v-if="auth.isAuthenticated">
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button"
-                data-bs-toggle="dropdown">
-                <i class="bi bi-person-circle me-2"></i>{{ auth.userName }}
+                data-bs-toggle="dropdown" style="color: var(--text-primary);">
+                <div class="rounded-circle d-flex align-items-center justify-content-center me-2"
+                  style="width: 32px; height: 32px; background: var(--primary-light); color: var(--primary); font-size: 0.85rem;">
+                  <i class="bi bi-person-fill"></i>
+                </div>
+                <span class="fw-semibold">{{ auth.userName }}</span>
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
@@ -68,7 +72,7 @@ async function handleLogout() {
                     <i class="bi bi-award me-2"></i>Сертификаты
                   </RouterLink>
                 </li>
-                <li><hr class="dropdown-divider"></li>
+                <li><hr class="dropdown-divider" style="margin: 0.35rem 0;"></li>
                 <li>
                   <a class="dropdown-item text-danger" href="#" @click.prevent="handleLogout">
                     <i class="bi bi-box-arrow-right me-2"></i>Выйти
@@ -78,11 +82,11 @@ async function handleLogout() {
             </li>
           </template>
           <template v-else>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/login">Войти</RouterLink>
+            <li class="nav-item d-flex align-items-center">
+              <RouterLink class="nav-link fw-semibold" to="/login" style="color: var(--text-secondary);">Войти</RouterLink>
             </li>
-            <li class="nav-item">
-              <RouterLink class="btn btn-outline-light btn-sm ms-2 mt-1" to="/register">Регистрация</RouterLink>
+            <li class="nav-item d-flex align-items-center">
+              <RouterLink class="btn btn-primary btn-sm ms-2" to="/register">Регистрация</RouterLink>
             </li>
           </template>
         </ul>

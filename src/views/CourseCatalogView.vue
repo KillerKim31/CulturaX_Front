@@ -83,7 +83,7 @@ function complexityDots(level) {
         <div class="card h-100">
           <div class="card-body d-flex flex-column">
             <div class="d-flex justify-content-between align-items-start mb-2">
-              <span class="badge bg-primary bg-opacity-10 text-primary">{{ course.language?.toUpperCase() }}</span>
+              <span class="badge" style="background: var(--primary); color: #fff;">{{ course.language?.toUpperCase() }}</span>
               <div class="complexity-badge" :title="complexityLabel(course.complexity)">
                 <span v-for="(active, i) in complexityDots(course.complexity)" :key="i"
                   class="complexity-dot" :class="{ active }"></span>

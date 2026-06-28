@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCourseStore } from '@/stores/courses'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +12,7 @@ const auth = useAuthStore()
 
 const course = ref(null)
 const lessons = ref([])
+const tests = ref([])
 const loading = ref(true)
 const enrolling = ref(false)
 const enrolled = ref(false)
@@ -22,6 +24,24 @@ onMounted(async () => {
     course.value = await courseStore.fetchCourseDetail(id)
     lessons.value = await courseStore.fetchLessons(id)
 
+    for (const lesson of lessons.value) {
+      try {
+        const { data } = await api.get(`/courses/${id}/chapters`, {
+          params: { lessonId: lesson.id }
+        })
+        lesson.chapters = data
+      } catch {
+        lesson.chapters = []
+      }
+    }
+
+    try {
+      const { data } = await api.get(`/courses/${id}/tests`)
+      tests.value = data
+    } catch {
+      tests.value = []
+    }
+
     if (auth.isAuthenticated) {
       try {
         const enrolledList = await courseStore.getEnrolledCourses()
@@ -30,7 +50,7 @@ onMounted(async () => {
           enrolled.value = true
           progress.value = match.progressPercent
         }
-      } catch (e) { /* not enrolled */ }
+      } catch (e) { /* not enrolled or token expired */ }
     }
   } catch (e) {
     console.error(e)
@@ -121,18 +141,21 @@ function complexityDots(level) {
                   data-bs-toggle="collapse" :data-bs-target="'#lesson-' + lesson.id">
                   <span class="badge bg-primary bg-opacity-10 text-primary me-2">{{ idx + 1 }}</span>
                   {{ lesson.title }}
-                  <span class="text-muted small ms-auto me-2">{{ lesson.chaptersCount }} глав</span>
+                  <span class="text-muted small ms-auto me-2">{{ lesson.chapters?.length || lesson.chaptersCount || 0 }} глав</span>
                 </button>
               </h2>
               <div :id="'lesson-' + lesson.id" class="accordion-collapse collapse" :class="{ show: idx === 0 }"
                 data-bs-parent="#lessonsAccordion">
                 <div class="accordion-body p-0">
-                  <RouterLink v-if="enrolled" :to="`/course/${course.id}/lesson/${lesson.id}`"
-                    class="d-block px-4 py-3 border-bottom text-decoration-none hover-bg-light">
-                    <i class="bi bi-play-circle me-2 text-primary"></i>Начать модуль
-                  </RouterLink>
+                  <div v-if="lesson.chapters && lesson.chapters.length">
+                    <div v-for="(ch, cIdx) in lesson.chapters" :key="ch.id"
+                      class="d-flex align-items-center px-4 py-2 border-bottom">
+                      <span class="text-muted small me-3">{{ cIdx + 1 }}.</span>
+                      <span>{{ ch.title }}</span>
+                    </div>
+                  </div>
                   <div v-else class="px-4 py-3 text-muted small">
-                    <i class="bi bi-lock me-2"></i>Запишитесь на курс, чтобы открыть содержимое
+                    Разделы пока не добавлены
                   </div>
                 </div>
               </div>
@@ -140,6 +163,55 @@ function complexityDots(level) {
           </div>
           <div v-else class="text-muted text-center py-4">
             Модули пока не добавлены
+          </div>
+
+          <div v-if="tests.length" class="mt-4">
+            <h5 class="fw-bold mb-3">Тесты и экзамены</h5>
+            <div class="d-flex flex-column gap-2">
+              <RouterLink v-for="t in tests" :key="t.id" :to="`/test/${t.id}`"
+                class="card p-3 text-decoration-none hover-shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center">
+                    <div class="rounded p-2 me-3" :class="t.testType === 'COURSE_EXAM' ? 'bg-warning bg-opacity-10' : 'bg-primary bg-opacity-10'">
+                      <i class="bi" :class="t.testType === 'COURSE_EXAM' ? 'bi-award text-warning' : 'bi-clipboard-check text-primary'"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">{{ t.title }}</div>
+                      <small class="text-muted">
+                        {{ t.testType === 'COURSE_EXAM' ? 'Экзамен' : t.testType === 'MODULE' ? 'Тест модуля' : 'Тест раздела' }}
+                        · Проходной: {{ t.passingScore }}%
+                        <span v-if="t.timeLimitMinutes"> · {{ t.timeLimitMinutes }} мин</span>
+                      </small>
+                    </div>
+                  </div>
+                  <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+              </RouterLink>
+            </div>
+          </div>
+
+          <div v-if="tests.some(t => t.testType === 'COURSE_EXAM')" class="mt-4">
+            <div class="card border-warning">
+              <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                  <div class="rounded bg-warning bg-opacity-10 p-2 me-3">
+                    <i class="bi bi-award text-warning fs-5"></i>
+                  </div>
+                  <div>
+                    <h6 class="fw-bold mb-0">Экзамен по завершении курса</h6>
+                    <small class="text-muted">Успешное прохождение экзамена даёт право на получение сертификата</small>
+                  </div>
+                </div>
+                <div class="d-flex gap-4 mt-3 text-muted small">
+                  <span v-for="ex in tests.filter(t => t.testType === 'COURSE_EXAM')" :key="ex.id">
+                    <i class="bi bi-clock me-1"></i>Время: {{ ex.timeLimitMinutes || '—' }} мин
+                  </span>
+                  <span v-for="ex in tests.filter(t => t.testType === 'COURSE_EXAM')" :key="'s'+ex.id">
+                    <i class="bi bi-check-circle me-1"></i>Проходной: {{ ex.passingScore }}%
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

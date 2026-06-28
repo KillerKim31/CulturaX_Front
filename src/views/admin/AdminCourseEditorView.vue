@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 
 const route = useRoute()
 const course = ref(null)
@@ -15,6 +16,12 @@ const showLessonForm = ref(false)
 const lessonForm = ref({ title: '', orderIndex: 1 })
 const showChapterForm = ref(null)
 const chapterForm = ref({ title: '', content: '', orderIndex: 1 })
+
+const editingChapter = ref(null)
+const editChapterForm = ref({ title: '', content: '', orderIndex: 1 })
+
+const previewChapter = ref(null)
+const expandedLessons = ref(new Set())
 
 onMounted(async () => {
   await loadCourse()
@@ -34,6 +41,19 @@ async function loadCourse() {
       isPublished: data.isPublished,
     }
     lessons.value = data.lessons || []
+
+    const cid = route.params.id
+    for (const lesson of lessons.value) {
+      try {
+        const { data: chapters } = await api.get(`/courses/${cid}/chapters`, {
+          params: { lessonId: lesson.id }
+        })
+        lesson.chapters = chapters
+      } catch {
+        lesson.chapters = []
+      }
+      lesson.chaptersCount = lesson.chapters.length
+    }
   } catch (e) {
     console.error(e)
   } finally {
@@ -63,7 +83,7 @@ async function createLesson() {
       courseId: Number(route.params.id),
       orderIndex: lessonForm.value.orderIndex,
     })
-    lessons.value.push({ ...data, chapters: [] })
+    lessons.value.push({ ...data, chapters: [], chaptersCount: 0 })
     showLessonForm.value = false
     lessonForm.value = { title: '', orderIndex: lessons.value.length + 1 }
   } catch (e) {
@@ -94,10 +114,44 @@ async function createChapter(lesson) {
     })
     if (!lesson.chapters) lesson.chapters = []
     lesson.chapters.push(data)
+    lesson.chaptersCount = lesson.chapters.length
     showChapterForm.value = null
     chapterForm.value = { title: '', content: '', orderIndex: 1 }
+    expandedLessons.value.add(lesson.id)
   } catch (e) {
     alert('Ошибка создания главы')
+  } finally {
+    saving.value = false
+  }
+}
+
+function startEditChapter(chapter) {
+  editingChapter.value = chapter.id
+  editChapterForm.value = {
+    title: chapter.title,
+    content: chapter.content || '',
+    orderIndex: chapter.orderIndex,
+  }
+}
+
+function cancelEditChapter() {
+  editingChapter.value = null
+}
+
+async function saveChapter(chapter) {
+  saving.value = true
+  try {
+    const { data } = await api.put(`/admin/chapter_lessons/${chapter.id}`, {
+      title: editChapterForm.value.title,
+      content: editChapterForm.value.content,
+      orderIndex: editChapterForm.value.orderIndex,
+    })
+    Object.assign(chapter, data)
+    chapter.content = editChapterForm.value.content
+    editingChapter.value = null
+    msg.value = { type: 'success', text: 'Глава сохранена' }
+  } catch (e) {
+    msg.value = { type: 'danger', text: 'Ошибка сохранения главы' }
   } finally {
     saving.value = false
   }
@@ -108,9 +162,22 @@ async function deleteChapter(lesson, chapter) {
   try {
     await api.delete(`/admin/chapter_lessons/${chapter.id}`)
     lesson.chapters = lesson.chapters.filter(c => c.id !== chapter.id)
+    lesson.chaptersCount = lesson.chapters.length
   } catch (e) {
     alert('Ошибка удаления')
   }
+}
+
+function toggleLesson(lesson) {
+  if (expandedLessons.value.has(lesson.id)) {
+    expandedLessons.value.delete(lesson.id)
+  } else {
+    expandedLessons.value.add(lesson.id)
+  }
+}
+
+function togglePreview(chapter) {
+  previewChapter.value = previewChapter.value === chapter.id ? null : chapter.id
 }
 
 function complexityLabel(level) {
@@ -160,8 +227,8 @@ function complexityLabel(level) {
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label">Описание</label>
-              <textarea v-model="courseForm.description" class="form-control" rows="3"></textarea>
+              <label class="form-label">Описание курса</label>
+              <RichTextEditor v-model="courseForm.description" placeholder="Описание курса..." />
             </div>
             <div class="col-md-4">
               <label class="form-label">Время прохождения (сек)</label>
@@ -182,9 +249,14 @@ function complexityLabel(level) {
 
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0">Модули и главы</h5>
-        <button class="btn btn-primary btn-sm" @click="showLessonForm = !showLessonForm">
-          <i class="bi bi-plus-circle me-1"></i>Добавить модуль
-        </button>
+        <div class="d-flex gap-2">
+          <RouterLink :to="`/admin/course/${route.params.id}/tests`" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-clipboard-check me-1"></i>Тесты курса
+          </RouterLink>
+          <button class="btn btn-primary btn-sm" @click="showLessonForm = !showLessonForm">
+            <i class="bi bi-plus-circle me-1"></i>Добавить модуль
+          </button>
+        </div>
       </div>
 
       <div v-if="showLessonForm" class="card p-3 mb-3">
@@ -205,12 +277,15 @@ function complexityLabel(level) {
       </div>
 
       <div v-for="lesson in lessons" :key="lesson.id" class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer;"
+          @click="toggleLesson(lesson)">
           <div class="d-flex align-items-center">
+            <i class="bi me-2" :class="expandedLessons.has(lesson.id) ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
             <span class="badge bg-primary bg-opacity-10 text-primary me-2">{{ lesson.orderIndex }}</span>
             <strong>{{ lesson.title }}</strong>
+            <span class="text-muted small ms-2">{{ lesson.chapters?.length || 0 }} глав</span>
           </div>
-          <div class="d-flex gap-1">
+          <div class="d-flex gap-1" @click.stop>
             <button class="btn btn-sm btn-outline-primary" @click="showChapterForm = showChapterForm === lesson.id ? null : lesson.id">
               <i class="bi bi-plus"></i> Главу
             </button>
@@ -221,37 +296,66 @@ function complexityLabel(level) {
         </div>
 
         <div v-if="showChapterForm === lesson.id" class="card-body border-bottom bg-light">
-          <form @submit.prevent="createChapter(lesson)" class="row g-2">
-            <div class="col-md-4">
+          <h6 class="fw-bold mb-3">Новая глава</h6>
+          <div class="row g-2 mb-2">
+            <div class="col-md-8">
               <input v-model="chapterForm.title" class="form-control form-control-sm" placeholder="Название главы" required>
-            </div>
-            <div class="col-md-4">
-              <input v-model="chapterForm.content" class="form-control form-control-sm" placeholder="HTML содержимое">
             </div>
             <div class="col-md-2">
               <input v-model.number="chapterForm.orderIndex" type="number" class="form-control form-control-sm" placeholder="Порядок" min="1">
             </div>
             <div class="col-md-2">
-              <button type="submit" class="btn btn-primary btn-sm w-100" :disabled="saving">Добавить</button>
+              <button type="button" class="btn btn-primary btn-sm w-100" @click="createChapter(lesson)" :disabled="saving || !chapterForm.title">
+                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>Добавить
+              </button>
             </div>
-          </form>
+          </div>
+          <label class="form-label small text-muted">Содержимое главы (HTML)</label>
+          <RichTextEditor v-model="chapterForm.content" placeholder="Введите содержимое главы..." />
         </div>
 
-        <div class="card-body p-0">
+        <div v-if="expandedLessons.has(lesson.id)" class="card-body p-0">
           <div v-if="lesson.chapters && lesson.chapters.length">
-            <div v-for="ch in lesson.chapters" :key="ch.id"
-              class="d-flex justify-content-between align-items-center px-4 py-2 border-bottom">
-              <div>
-                <span class="text-muted small me-2">{{ ch.orderIndex }}.</span>
-                {{ ch.title }}
-                <small class="text-muted ms-2">
-                  <span v-if="ch.imagesCount"><i class="bi bi-image me-1"></i>{{ ch.imagesCount }}</span>
-                  <span v-if="ch.videosCount"><i class="bi bi-camera-video me-1"></i>{{ ch.videosCount }}</span>
-                </small>
+            <div v-for="ch in lesson.chapters" :key="ch.id" class="border-bottom">
+              <div class="d-flex justify-content-between align-items-center px-4 py-2">
+                <div class="d-flex align-items-center flex-grow-1">
+                  <span class="text-muted small me-2">{{ ch.orderIndex }}.</span>
+                  <span class="fw-semibold">{{ ch.title }}</span>
+                </div>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" @click="togglePreview(ch)" :title="previewChapter === ch.id ? 'Скрыть превью' : 'Показать превью'">
+                    <i :class="previewChapter === ch.id ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-primary" @click="startEditChapter(ch)" title="Редактировать">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" @click="deleteChapter(lesson, ch)" title="Удалить">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
               </div>
-              <button class="btn btn-sm btn-outline-danger" @click="deleteChapter(lesson, ch)">
-                <i class="bi bi-trash"></i>
-              </button>
+
+              <div v-if="previewChapter === ch.id" class="px-4 pb-3">
+                <div class="border rounded p-3 bg-white chapter-preview" v-html="ch.content || '<em class=\'text-muted\'>Пусто</em>'"></div>
+              </div>
+
+              <div v-if="editingChapter === ch.id" class="px-4 pb-3 bg-light">
+                <div class="row g-2 mb-2">
+                  <div class="col-md-8">
+                    <input v-model="editChapterForm.title" class="form-control form-control-sm" placeholder="Название">
+                  </div>
+                  <div class="col-md-2">
+                    <input v-model.number="editChapterForm.orderIndex" type="number" class="form-control form-control-sm" min="1">
+                  </div>
+                  <div class="col-md-2 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-grow-1" @click="saveChapter(ch)" :disabled="saving">
+                      <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>Сохранить
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @click="cancelEditChapter">Отмена</button>
+                  </div>
+                </div>
+                <RichTextEditor v-model="editChapterForm.content" placeholder="Содержимое главы..." />
+              </div>
             </div>
           </div>
           <div v-else class="text-muted text-center py-3 small">Нет глав</div>
@@ -260,3 +364,9 @@ function complexityLabel(level) {
     </template>
   </div>
 </template>
+
+<style scoped>
+.chapter-preview :deep(img) { max-width: 100%; border-radius: 10px; }
+.chapter-preview :deep(pre) { background: var(--text-primary); color: #e8e9f0; padding: 0.75rem; border-radius: 10px; }
+.chapter-preview :deep(blockquote) { border-left: 3px solid var(--primary); padding-left: 1rem; color: var(--text-secondary); background: var(--primary-50); border-radius: 0 8px 8px 0; }
+</style>

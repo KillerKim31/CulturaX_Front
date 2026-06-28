@@ -31,12 +31,7 @@ const routes = [
     component: () => import('@/views/user/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
-  {
-    path: '/my-courses',
-    name: 'my-courses',
-    component: () => import('@/views/user/MyCoursesView.vue'),
-    meta: { requiresAuth: true },
-  },
+
   {
     path: '/course/:id',
     name: 'course-detail',
@@ -88,6 +83,18 @@ const routes = [
     path: '/admin/course/:id/edit',
     name: 'admin-course-edit',
     component: () => import('@/views/admin/AdminCourseEditorView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/course/:courseId/tests',
+    name: 'admin-course-tests',
+    component: () => import('@/views/admin/AdminCourseTestsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/test/:id/edit',
+    name: 'admin-test-edit',
+    component: () => import('@/views/admin/AdminTestEditorView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {

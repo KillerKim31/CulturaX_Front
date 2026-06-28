@@ -155,6 +155,9 @@ function complexityLabel(level) {
               <td>{{ c.authorName }}</td>
               <td>
                 <div class="d-flex gap-1">
+                  <RouterLink :to="`/admin/course/${c.id}/tests`" class="btn btn-sm btn-outline-success" title="Тесты">
+                    <i class="bi bi-clipboard-check"></i>
+                  </RouterLink>
                   <RouterLink :to="`/admin/course/${c.id}/edit`" class="btn btn-sm btn-outline-primary" title="Редактировать">
                     <i class="bi bi-pencil"></i>
                   </RouterLink>
